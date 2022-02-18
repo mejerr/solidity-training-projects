@@ -7,7 +7,7 @@ import getWeb3 from "./getWeb3";
 import "./App.css";
 
 class App extends Component {
-  state = { loaded: false, kycAddress: "0x" };
+  state = { loaded: false, kycAddress: "0x", tokenSaleAddress: null, userTokens: 0 };
 
   componentDidMount = async () => {
     try {
@@ -35,7 +35,8 @@ class App extends Component {
       );
       // Set web3, accounts, and contract to the state, and then proceed with an
       // example of interacting with the contract's methods.
-      this.setState({ loaded: true });
+      this.listenToTokenTransfer();
+      this.setState({ loaded: true, tokenSaleAddress: MyTokenSale.networks[this.networkId].address }, this.updateUserTokens);
     } catch (error) {
       // Catch any errors for any of the above operations.
       alert(
@@ -45,19 +46,34 @@ class App extends Component {
     }
   };
 
+  updateUserTokens = async() => {
+    let userTokens = await this.tokenInstance.methods.balanceOf(this.accounts[0]).call();
+    this.setState({ userTokens });
+  };
+
+  listenToTokenTransfer = () => {
+    this.tokenInstance.events.Transfer({ to: this.accounts[0]}).on("data", this.updateUserTokens);
+  };
+
+  handleBuyTokens = async() => {
+    await this.tokenSaleInstance.methods.buyTokens(this.accounts[0]).send({ from: this.accounts[0], value: this.web3.utils.toWei("1", "wei")});
+  }
+
   handleInputChange = event => {
     const target = event.target;
-    const value = target.type == "checkbox" ? target.checked : target.value;
+    const value = target.type === "checkbox" ? target.checked : target.value;
     const name = target.name;
     this.setState({
       [name]: value
-    })
-  }
+    });
+  };
 
   handleKycWhiteListening = async () => {
     await this.kycContractInstance.methods.setKycCompleted(this.state.kycAddress).send({ from: this.accounts[0] });
     alert("KYC for " + this.state.kycAddress + " is completed");
-  }
+  };
+
+  handleBuyTokens = () => {};
 
   render() {
     if (!this.state.loaded) {
@@ -70,6 +86,10 @@ class App extends Component {
         <h2>Kyc Whitelistening</h2>
         Address to allow: <input type="text" name="kycAddress" value={this.state.kycAddress} onChange={this.handleInputChange}/>
         <button type="button" onClick={this.handleKycWhiteListening}>Add button</button>
+        <h2>Buy Tokens</h2>
+        <p>If you want to buy tokens, send Wei to this address: {this.state.tokenSaleAddress}</p>
+        <p>You currently have: {this.state.userTokens} CAPPU Tokens</p>
+        <button type="button" onClick={this.handleBuyTokens}>Buy more tokens</button>
       </div>
     );
   }
